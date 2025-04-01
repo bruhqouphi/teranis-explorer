@@ -1,33 +1,113 @@
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Upload, BarChart2, Cloud, Bell } from "lucide-react";
+import { Upload } from "lucide-react";
+import { Link } from "react-router-dom";
+import CropHealthChart from "@/components/CropHealthChart";
+import WeatherCard from "@/components/WeatherCard";
+import ActivityFeed from "@/components/ActivityFeed";
+import { 
+  getCropHealthData, 
+  getDiseaseData, 
+  getWeatherForecast, 
+  getRecentActivities,
+  CropHealth,
+  DiseaseData,
+  WeatherForecast,
+  ActivityItem
+} from "@/lib/dashboardService";
 
 const Dashboard = () => {
+  // State for the different data types
+  const [cropHealth, setCropHealth] = useState<CropHealth | null>(null);
+  const [diseases, setDiseases] = useState<DiseaseData[]>([]);
+  const [weatherForecasts, setWeatherForecasts] = useState<WeatherForecast[]>([]);
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Mock historical health data
+  const [healthHistory, setHealthHistory] = useState<{ date: string; health: number }[]>([]);
+
+  useEffect(() => {
+    // Simulate API calls
+    const fetchDashboardData = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Get all the data
+        const healthData = getCropHealthData();
+        const diseaseData = getDiseaseData();
+        const forecastData = getWeatherForecast();
+        const activityData = getRecentActivities();
+        
+        // Generate mock historical data
+        const mockHistory = generateMockHealthHistory();
+        
+        // Update state
+        setCropHealth(healthData);
+        setDiseases(diseaseData);
+        setWeatherForecasts(forecastData);
+        setActivities(activityData);
+        setHealthHistory(mockHistory);
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
+
+  // Generate mock historical health data
+  const generateMockHealthHistory = () => {
+    const data = [];
+    const today = new Date();
+    
+    for (let i = 30; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      
+      data.push({
+        date: date.toISOString(),
+        health: Math.floor(Math.random() * 15) + 80 // Random between 80-95
+      });
+    }
+    
+    return data;
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <header className="bg-white dark:bg-gray-800 shadow-sm">
         <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
-          <h1 className="text-lg font-semibold text-gray-900">Farm Dashboard</h1>
+          <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Farm Dashboard</h1>
         </div>
       </header>
       
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
         {/* Upload Section */}
-        <div className="bg-white p-6 rounded-lg shadow-sm mb-6">
-          <h2 className="text-xl font-medium text-gray-900 mb-4">Upload Crop Images for Analysis</h2>
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm mb-6">
+          <h2 className="text-xl font-medium text-gray-900 dark:text-white mb-4">Upload Crop Images for Analysis</h2>
+          <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-8 text-center">
             <Upload className="mx-auto h-12 w-12 text-gray-400" />
-            <p className="mt-2 text-sm text-gray-600">Drag and drop crop images, or</p>
-            <Button className="mt-2 bg-emerald-600 hover:bg-emerald-700">Browse Files</Button>
-            <p className="mt-2 text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Drag and drop crop images, or</p>
+            <Link to="/ai-analysis">
+              <Button className="mt-2 bg-emerald-600 hover:bg-emerald-700">Browse Files</Button>
+            </Link>
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">PNG, JPG, GIF up to 10MB</p>
           </div>
         </div>
         
+        {/* Health Trends Chart - New component */}
+        <div className="mb-6">
+          <CropHealthChart data={healthHistory} />
+        </div>
+        
         {/* Analysis Results */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 mb-6">
           {/* Health Score */}
           <Card>
             <CardHeader>
@@ -36,11 +116,20 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-center">
-                <span className="text-5xl font-bold text-emerald-600">86%</span>
-                <Progress value={86} className="h-2 mt-3" />
-                <p className="mt-4 text-sm text-gray-500">
-                  Your crops are in good health. Some minor issues detected.
-                </p>
+                {isLoading ? (
+                  <div className="animate-pulse flex flex-col items-center">
+                    <div className="h-10 w-20 bg-gray-200 dark:bg-gray-700 rounded mb-2"></div>
+                    <div className="h-2 w-full bg-gray-200 dark:bg-gray-700 rounded"></div>
+                  </div>
+                ) : (
+                  <>
+                    <span className="text-5xl font-bold text-emerald-600">{cropHealth?.score}%</span>
+                    <Progress value={cropHealth?.score} className="h-2 mt-3" />
+                    <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
+                      {cropHealth?.status}
+                    </p>
+                  </>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -53,117 +142,33 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 rounded-full bg-red-500 mr-2"></div>
-                    <span>Powdery Mildew</span>
+                {isLoading ? (
+                  <div className="animate-pulse space-y-3">
+                    <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                    <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                    <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded"></div>
                   </div>
-                  <span className="font-medium">12%</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 rounded-full bg-yellow-500 mr-2"></div>
-                    <span>Nutrient Deficiency</span>
-                  </div>
-                  <span className="font-medium">8%</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 rounded-full bg-emerald-500 mr-2"></div>
-                    <span>Healthy</span>
-                  </div>
-                  <span className="font-medium">80%</span>
-                </div>
+                ) : (
+                  diseases.map((disease, index) => (
+                    <div key={index} className="flex justify-between items-center">
+                      <div className="flex items-center">
+                        <div className={`w-3 h-3 rounded-full ${disease.color} mr-2`}></div>
+                        <span>{disease.name}</span>
+                      </div>
+                      <span className="font-medium">{disease.percentage}%</span>
+                    </div>
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>
           
-          {/* Weather Forecast */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Weather Forecast</CardTitle>
-              <CardDescription>Next 3 days</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="font-medium">Today</p>
-                    <p className="text-sm text-gray-500">May 15, 2023</p>
-                  </div>
-                  <div className="flex items-center">
-                    <Cloud className="h-6 w-6 text-blue-500 mr-2" />
-                    <span>24°C</span>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="font-medium">Tomorrow</p>
-                    <p className="text-sm text-gray-500">May 16, 2023</p>
-                  </div>
-                  <div className="flex items-center">
-                    <Cloud className="h-6 w-6 text-yellow-500 mr-2" />
-                    <span>27°C</span>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="font-medium">Wednesday</p>
-                    <p className="text-sm text-gray-500">May 17, 2023</p>
-                  </div>
-                  <div className="flex items-center">
-                    <Cloud className="h-6 w-6 text-gray-500 mr-2" />
-                    <span>22°C</span>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Weather Forecast - Using new component */}
+          <WeatherCard forecasts={weatherForecasts} />
         </div>
         
-        {/* Recent Activity */}
-        <div className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Activity</CardTitle>
-              <CardDescription>Your latest farm activities and AI analysis</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex">
-                  <div className="mr-4 flex-shrink-0">
-                    <Bell className="h-6 w-6 text-emerald-600" />
-                  </div>
-                  <div>
-                    <p className="font-medium">New AI Analysis Complete</p>
-                    <p className="text-sm text-gray-500">Your crop analysis from May 14 has been completed. View results.</p>
-                    <p className="text-xs text-gray-400 mt-1">Today at 10:30 AM</p>
-                  </div>
-                </div>
-                <div className="flex">
-                  <div className="mr-4 flex-shrink-0">
-                    <BarChart2 className="h-6 w-6 text-emerald-600" />
-                  </div>
-                  <div>
-                    <p className="font-medium">Yield Prediction Updated</p>
-                    <p className="text-sm text-gray-500">Your expected yield for this season has been updated based on recent data.</p>
-                    <p className="text-xs text-gray-400 mt-1">Yesterday at 2:15 PM</p>
-                  </div>
-                </div>
-                <div className="flex">
-                  <div className="mr-4 flex-shrink-0">
-                    <Cloud className="h-6 w-6 text-emerald-600" />
-                  </div>
-                  <div>
-                    <p className="font-medium">Weather Alert</p>
-                    <p className="text-sm text-gray-500">Potential rainfall expected in your region over the next 48 hours.</p>
-                    <p className="text-xs text-gray-400 mt-1">May 13 at 9:00 AM</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        {/* Recent Activity - Using new component */}
+        <ActivityFeed activities={activities} />
       </main>
     </div>
   );
